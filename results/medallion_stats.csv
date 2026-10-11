@@ -1,0 +1,8 @@
+таблица,строк,файлов,байт,мб,кодек,запись_с
+bronze.lakehouse.raw_customer,1500000,3,80410281,76.69,GZIP,7.14
+bronze.lakehouse.raw_orders,15000000,8,373528852,356.22,GZIP,18.17
+bronze.lakehouse.raw_lineitem,59986052,8,1534753137,1463.65,GZIP,69.57
+bronze.lakehouse.raw_nation,25,1,2262,0.0,GZIP,0.12
+silver.lakehouse.dim_customer,1500000,1,14421760,13.75,ZSTD,3.1
+silver.lakehouse.fct_orders,15000000,6,168922189,161.1,ZSTD,9.81
+gold.lakehouse.mart_large_orders,100,1,4567,0.0,SNAPPY,1.01

@@ -1,0 +1,2 @@
+сверка gold с оригинальным Q18 (tpch.sf10): {'rows_orig': 100, 'rows_gold': 100, 'only_in_orig': 0, 'only_in_gold': 0, 'sum_qty_orig': 30977, 'sum_qty_gold': 30977}
+запрос к витрине gold: 0.194 с

@@ -1,0 +1,137 @@
+### 0. Исходная схема и данные
+> DESCRIBE silver.lakehouse.dim_customer
+   Column    |     Type      | Extra | Comment 
+-------------+---------------+-------+---------
+ custkey     | bigint        |       |         
+ name        | varchar       |       |         
+ nationkey   | bigint        |       |         
+ nation_name | varchar       |       |         
+ mktsegment  | varchar       |       |         
+ acctbal     | decimal(12,2) |       |         
+(6 rows)
+
+> SELECT custkey, name, nation_name, mktsegment FROM silver.lakehouse.dim_customer ORDER BY custkey LIMIT 3
+ custkey |        name        | nation_name | mktsegment 
+---------+--------------------+-------------+------------
+       1 | Customer#000000001 | MOROCCO     | BUILDING   
+       2 | Customer#000000002 | JORDAN      | AUTOMOBILE 
+       3 | Customer#000000003 | ARGENTINA   | AUTOMOBILE 
+(3 rows)
+
+> SELECT snapshot_id, operation, committed_at FROM silver.lakehouse."dim_customer$snapshots" ORDER BY committed_at
+     snapshot_id     | operation |        committed_at         
+---------------------+-----------+-----------------------------
+ 3463526500343324520 | append    | 2026-10-11 15:59:21.101 UTC 
+(1 row)
+
+> SELECT count(*) AS files FROM silver.lakehouse."dim_customer$files"
+ files 
+-------
+     1 
+(1 row)
+
+### 1. ADD COLUMN: добавили колонку vip (признак крупного клиента)
+> ALTER TABLE silver.lakehouse.dim_customer ADD COLUMN vip boolean
+
+> SELECT custkey, name, vip FROM silver.lakehouse.dim_customer ORDER BY custkey LIMIT 3
+ custkey |        name        | vip  
+---------+--------------------+------
+       1 | Customer#000000001 | NULL 
+       2 | Customer#000000002 | NULL 
+       3 | Customer#000000003 | NULL 
+(3 rows)
+
+> SELECT count(*) AS files FROM silver.lakehouse."dim_customer$files"
+ files 
+-------
+     1 
+(1 row)
+
+### заполнили vip для клиентов с крупными заказами (> 300 единиц) - это уже новый снапшот
+> UPDATE silver.lakehouse.dim_customer SET vip = true WHERE custkey IN (SELECT custkey FROM silver.lakehouse.fct_orders WHERE total_quantity > 300)
+
+> SELECT vip, count(*) AS cnt FROM silver.lakehouse.dim_customer GROUP BY vip
+ vip  |   cnt   
+------+---------
+ true |     623 
+ NULL | 1499377 
+(2 rows)
+
+### 2. RENAME COLUMN: name -> customer_name
+> ALTER TABLE silver.lakehouse.dim_customer RENAME COLUMN name TO customer_name
+
+> SELECT custkey, customer_name, vip FROM silver.lakehouse.dim_customer ORDER BY custkey LIMIT 3
+ custkey |   customer_name    | vip  
+---------+--------------------+------
+       1 | Customer#000000001 | NULL 
+       2 | Customer#000000002 | NULL 
+       3 | Customer#000000003 | NULL 
+(3 rows)
+
+> SELECT snapshot_id, operation, committed_at FROM silver.lakehouse."dim_customer$snapshots" ORDER BY committed_at
+     snapshot_id     | operation |        committed_at         
+---------------------+-----------+-----------------------------
+ 3463526500343324520 | append    | 2026-10-11 15:59:21.101 UTC 
+ 3997636817928602600 | overwrite | 2026-10-11 16:00:06.929 UTC 
+(2 rows)
+
+### 3. Запоминаем текущий (хороший) снапшот
+GOOD = 3997636817928602600
+> SELECT count(*) AS rows_before FROM silver.lakehouse.dim_customer
+ rows_before 
+-------------
+     1500000 
+(1 row)
+
+### 4. Авария: случайно удалили всех клиентов не из сегмента BUILDING
+> DELETE FROM silver.lakehouse.dim_customer WHERE mktsegment <> 'BUILDING'
+
+> SELECT count(*) AS rows_after_delete FROM silver.lakehouse.dim_customer
+ rows_after_delete 
+-------------------
+            300276 
+(1 row)
+
+### 5. Time travel: смотрим таблицу до удаления
+> SELECT count(*) AS rows_in_good_snapshot FROM silver.lakehouse.dim_customer FOR VERSION AS OF 3997636817928602600
+ rows_in_good_snapshot 
+-----------------------
+               1500000 
+(1 row)
+
+### 6. Восстановление: откат таблицы на хороший снапшот
+> ALTER TABLE silver.lakehouse.dim_customer EXECUTE rollback_to_snapshot(3997636817928602600)
+
+> SELECT count(*) AS rows_after_rollback FROM silver.lakehouse.dim_customer
+ rows_after_rollback 
+---------------------
+             1500000 
+(1 row)
+
+> SELECT vip, count(*) AS cnt FROM silver.lakehouse.dim_customer GROUP BY vip
+ vip  |   cnt   
+------+---------
+ true |     623 
+ NULL | 1499377 
+(2 rows)
+
+> SELECT made_current_at, snapshot_id, is_current_ancestor FROM silver.lakehouse."dim_customer$history" ORDER BY made_current_at
+       made_current_at       |     snapshot_id     | is_current_ancestor 
+-----------------------------+---------------------+---------------------
+ 2026-10-11 15:59:21.101 UTC | 3463526500343324520 | true                
+ 2026-10-11 16:00:06.929 UTC | 3997636817928602600 | true                
+ 2026-10-11 16:00:12.615 UTC | 5407174346102428571 | false               
+(3 rows)
+
+> DESCRIBE silver.lakehouse.dim_customer
+    Column     |     Type      | Extra | Comment 
+---------------+---------------+-------+---------
+ custkey       | bigint        |       |         
+ customer_name | varchar       |       |         
+ nationkey     | bigint        |       |         
+ nation_name   | varchar       |       |         
+ mktsegment    | varchar       |       |         
+ acctbal       | decimal(12,2) |       |         
+ vip           | boolean       |       |         
+(7 rows)
+

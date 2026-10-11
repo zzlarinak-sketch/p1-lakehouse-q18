@@ -1,0 +1,46 @@
+### 1. Таблицы, которые Spark видит в Bronze
++---------+------------+-----------+
+|namespace|tableName   |isTemporary|
++---------+------------+-----------+
+|lakehouse|raw_customer|false      |
+|lakehouse|raw_orders  |false      |
+|lakehouse|raw_lineitem|false      |
+|lakehouse|raw_nation  |false      |
++---------+------------+-----------+
+
+### 2. Строк в каждой таблице
+  raw_customer: 1,500,000
+  raw_orders: 15,000,000
+  raw_lineitem: 59,986,052
+  raw_nation: 25
+
+### 3. Схема raw_orders (служебные loaded_at и source_system на месте)
+root
+ |-- orderkey: long (nullable = true)
+ |-- custkey: long (nullable = true)
+ |-- orderstatus: string (nullable = true)
+ |-- totalprice: double (nullable = true)
+ |-- orderdate: date (nullable = true)
+ |-- orderpriority: string (nullable = true)
+ |-- clerk: string (nullable = true)
+ |-- shippriority: integer (nullable = true)
+ |-- comment: string (nullable = true)
+ |-- loaded_at: timestamp (nullable = true)
+ |-- source_system: string (nullable = true)
+
+### 4. Снапшоты raw_lineitem (метаданные Iceberg видны и из Spark)
++-------------------+---------+-----------------------+
+|snapshot_id        |operation|committed_at           |
++-------------------+---------+-----------------------+
+|5215754325436161589|append   |2026-10-11 15:59:17.772|
++-------------------+---------+-----------------------+
+
+### 5. Запрос варианта 3 (Q18) в Spark прямо по Bronze
+  строк: 100, время: 17.0 с
+  сумма total_quantity: 30977
+  сумма totalprice: 51135629.28
+  Customer#001287812  order 42290181  1997-11-26  558289.17  qty 318
+  Customer#000644812  order 2745894  1996-07-04  557664.53  qty 304
+  Customer#001172513  order 36667107  1997-06-06  550142.18  qty 322
+  Customer#000399481  order 43906817  1995-04-06  549431.65  qty 312
+  Customer#000571654  order 21213895  1992-01-03  549380.08  qty 327
