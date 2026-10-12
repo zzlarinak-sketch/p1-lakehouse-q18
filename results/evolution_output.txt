@@ -1,14 +1,16 @@
 ### 0. Исходная схема и данные
 > DESCRIBE silver.lakehouse.dim_customer
-   Column    |     Type      | Extra | Comment 
--------------+---------------+-------+---------
- custkey     | bigint        |       |         
- name        | varchar       |       |         
- nationkey   | bigint        |       |         
- nation_name | varchar       |       |         
- mktsegment  | varchar       |       |         
- acctbal     | decimal(12,2) |       |         
-(6 rows)
+       Column       |     Type      | Extra | Comment 
+--------------------+---------------+-------+---------
+ custkey            | bigint        |       |         
+ name               | varchar       |       |         
+ nationkey          | bigint        |       |         
+ nation_name        | varchar       |       |         
+ mktsegment         | varchar       |       |         
+ acctbal            | decimal(12,2) |       |         
+ phone_country_code | integer       |       |         
+ phone_number       | varchar       |       |         
+(8 rows)
 
 > SELECT custkey, name, nation_name, mktsegment FROM silver.lakehouse.dim_customer ORDER BY custkey LIMIT 3
  custkey |        name        | nation_name | mktsegment 
@@ -21,13 +23,13 @@
 > SELECT snapshot_id, operation, committed_at FROM silver.lakehouse."dim_customer$snapshots" ORDER BY committed_at
      snapshot_id     | operation |        committed_at         
 ---------------------+-----------+-----------------------------
- 3463526500343324520 | append    | 2026-10-11 15:59:21.101 UTC 
+ 9087034022901642840 | append    | 2026-10-12 12:07:10.953 UTC 
 (1 row)
 
 > SELECT count(*) AS files FROM silver.lakehouse."dim_customer$files"
  files 
 -------
-     1 
+     2 
 (1 row)
 
 ### 1. ADD COLUMN: добавили колонку vip (признак крупного клиента)
@@ -44,7 +46,7 @@
 > SELECT count(*) AS files FROM silver.lakehouse."dim_customer$files"
  files 
 -------
-     1 
+     2 
 (1 row)
 
 ### заполнили vip для клиентов с крупными заказами (> 300 единиц) - это уже новый снапшот
@@ -71,12 +73,12 @@
 > SELECT snapshot_id, operation, committed_at FROM silver.lakehouse."dim_customer$snapshots" ORDER BY committed_at
      snapshot_id     | operation |        committed_at         
 ---------------------+-----------+-----------------------------
- 3463526500343324520 | append    | 2026-10-11 15:59:21.101 UTC 
- 3997636817928602600 | overwrite | 2026-10-11 16:00:06.929 UTC 
+ 9087034022901642840 | append    | 2026-10-12 12:07:10.953 UTC 
+ 6781445809304983193 | overwrite | 2026-10-12 12:07:48.600 UTC 
 (2 rows)
 
 ### 3. Запоминаем текущий (хороший) снапшот
-GOOD = 3997636817928602600
+GOOD = 6781445809304983193
 > SELECT count(*) AS rows_before FROM silver.lakehouse.dim_customer
  rows_before 
 -------------
@@ -93,14 +95,14 @@ GOOD = 3997636817928602600
 (1 row)
 
 ### 5. Time travel: смотрим таблицу до удаления
-> SELECT count(*) AS rows_in_good_snapshot FROM silver.lakehouse.dim_customer FOR VERSION AS OF 3997636817928602600
+> SELECT count(*) AS rows_in_good_snapshot FROM silver.lakehouse.dim_customer FOR VERSION AS OF 6781445809304983193
  rows_in_good_snapshot 
 -----------------------
                1500000 
 (1 row)
 
 ### 6. Восстановление: откат таблицы на хороший снапшот
-> ALTER TABLE silver.lakehouse.dim_customer EXECUTE rollback_to_snapshot(3997636817928602600)
+> ALTER TABLE silver.lakehouse.dim_customer EXECUTE rollback_to_snapshot(6781445809304983193)
 
 > SELECT count(*) AS rows_after_rollback FROM silver.lakehouse.dim_customer
  rows_after_rollback 
@@ -118,20 +120,22 @@ GOOD = 3997636817928602600
 > SELECT made_current_at, snapshot_id, is_current_ancestor FROM silver.lakehouse."dim_customer$history" ORDER BY made_current_at
        made_current_at       |     snapshot_id     | is_current_ancestor 
 -----------------------------+---------------------+---------------------
- 2026-10-11 15:59:21.101 UTC | 3463526500343324520 | true                
- 2026-10-11 16:00:06.929 UTC | 3997636817928602600 | true                
- 2026-10-11 16:00:12.615 UTC | 5407174346102428571 | false               
+ 2026-10-12 12:07:10.953 UTC | 9087034022901642840 | true                
+ 2026-10-12 12:07:48.600 UTC | 6781445809304983193 | true                
+ 2026-10-12 12:07:53.078 UTC | 3840938507935473784 | false               
 (3 rows)
 
 > DESCRIBE silver.lakehouse.dim_customer
-    Column     |     Type      | Extra | Comment 
----------------+---------------+-------+---------
- custkey       | bigint        |       |         
- customer_name | varchar       |       |         
- nationkey     | bigint        |       |         
- nation_name   | varchar       |       |         
- mktsegment    | varchar       |       |         
- acctbal       | decimal(12,2) |       |         
- vip           | boolean       |       |         
-(7 rows)
+       Column       |     Type      | Extra | Comment 
+--------------------+---------------+-------+---------
+ custkey            | bigint        |       |         
+ customer_name      | varchar       |       |         
+ nationkey          | bigint        |       |         
+ nation_name        | varchar       |       |         
+ mktsegment         | varchar       |       |         
+ acctbal            | decimal(12,2) |       |         
+ phone_country_code | integer       |       |         
+ phone_number       | varchar       |       |         
+ vip                | boolean       |       |         
+(9 rows)
 

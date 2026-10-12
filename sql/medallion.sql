@@ -39,14 +39,18 @@ FROM tpch.sf10.nation;
 SET SESSION silver.compression_codec = 'ZSTD';
 
 -- клиенты: один ряд на custkey (дедупликация по последней загрузке),
--- обрезаем пробелы, приводим сегмент к верхнему регистру, добавляем название страны
+-- обрезаем пробелы, приводим сегмент к верхнему регистру, добавляем название страны.
+-- Нормализация телефона: "25-989-741-2988" -> код страны 25 и номер "989-741-2988"
+-- (в одном поле было два разных значения).
 CREATE TABLE silver.lakehouse.dim_customer WITH (format = 'PARQUET') AS
 SELECT c.custkey,
        trim(c.name)             AS name,
        c.nationkey,
        trim(n.name)             AS nation_name,
        upper(trim(c.mktsegment)) AS mktsegment,
-       CAST(c.acctbal AS decimal(12, 2)) AS acctbal
+       CAST(c.acctbal AS decimal(12, 2)) AS acctbal,
+       CAST(split_part(c.phone, '-', 1) AS integer)    AS phone_country_code,
+       substr(c.phone, strpos(c.phone, '-') + 1)       AS phone_number
 FROM (
   SELECT *, row_number() OVER (PARTITION BY custkey ORDER BY loaded_at DESC) AS rn
   FROM bronze.lakehouse.raw_customer
@@ -71,6 +75,10 @@ SELECT o.orderkey,
        o.custkey,
        o.orderdate,
        o.orderstatus,
+       -- "1-URGENT" -> уровень 1 и название URGENT; "Clerk#000000951" -> 951
+       CAST(split_part(o.orderpriority, '-', 1) AS integer) AS priority_level,
+       regexp_replace(o.orderpriority, '^[0-9]+-', '')      AS priority_name,
+       CAST(regexp_extract(o.clerk, '[0-9]+$') AS integer)  AS clerk_id,
        CAST(o.totalprice AS decimal(12, 2)) AS totalprice,
        CAST(li.total_quantity AS integer)   AS total_quantity,
        CAST(li.line_cnt AS integer)         AS line_cnt
@@ -78,6 +86,18 @@ FROM bronze.lakehouse.raw_orders o
 JOIN li ON li.orderkey = o.orderkey
 WHERE o.orderkey IS NOT NULL
   AND o.custkey IS NOT NULL;
+
+-- проверка нормализации: всё разложилось без потерь
+SELECT (SELECT count(*) FROM silver.lakehouse.dim_customer
+        WHERE phone_country_code IS NULL OR phone_number IS NULL)          AS phone_null,
+       (SELECT count(*) FROM silver.lakehouse.dim_customer
+        WHERE phone_country_code <> nationkey + 10)                         AS phone_code_mismatch,
+       (SELECT count(DISTINCT phone_country_code) FROM silver.lakehouse.dim_customer) AS phone_codes,
+       (SELECT count(*) FROM silver.lakehouse.fct_orders
+        WHERE priority_level IS NULL OR clerk_id IS NULL)                   AS priority_clerk_null,
+       (SELECT count(DISTINCT CAST(priority_level AS varchar) || '-' || priority_name)
+        FROM silver.lakehouse.fct_orders)                                   AS priorities,
+       (SELECT count(DISTINCT clerk_id) FROM silver.lakehouse.fct_orders)   AS clerks;
 
 -- ===== GOLD: витрина под запрос - топ-100 крупных заказов (больше 300 единиц товара) =====
 SET SESSION gold.compression_codec = 'SNAPPY';

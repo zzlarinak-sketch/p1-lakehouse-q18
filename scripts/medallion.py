@@ -47,13 +47,19 @@ with open(os.path.join(OUT, "medallion_stats.csv"), "w", newline="", encoding="u
     w.writerow(["таблица", "строк", "файлов", "байт", "мб", "кодек", "запись_с"])
     w.writerows(stats)
 
-gold_cols, gold_rows, _ = selects[0]
+# selects: 0 - проверка нормализации silver, 1 - ответ gold, 2 - сверка с оригинальным Q18
+norm_cols, norm_rows, _ = selects[0]
+print("\n### Проверка нормализации Silver:", dict(zip(norm_cols, norm_rows[0])))
+with open(os.path.join(OUT, "silver_checks.txt"), "w", encoding="utf-8") as f:
+    f.write(f"проверка нормализации silver: {dict(zip(norm_cols, norm_rows[0]))}\n")
+
+gold_cols, gold_rows, _ = selects[1]
 with open(os.path.join(OUT, "gold_q18_top100.csv"), "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
     w.writerow(gold_cols)
     w.writerows(gold_rows)
 
-chk_cols, chk_rows, _ = selects[1]
+chk_cols, chk_rows, _ = selects[2]
 print("\n### Сверка Gold с оригинальным Q18:", dict(zip(chk_cols, chk_rows[0])))
 print(f"### Запрос к витрине Gold: {gold_sec:.3f} с")
 with open(os.path.join(OUT, "gold_check.txt"), "w", encoding="utf-8") as f:

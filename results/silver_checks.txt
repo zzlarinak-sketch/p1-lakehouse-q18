@@ -1,0 +1,1 @@
+проверка нормализации silver: {'phone_null': 0, 'phone_code_mismatch': 0, 'phone_codes': 25, 'priority_clerk_null': 0, 'priorities': 5, 'clerks': 10000}

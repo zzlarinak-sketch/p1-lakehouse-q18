@@ -32,11 +32,12 @@ root
 +-------------------+---------+-----------------------+
 |snapshot_id        |operation|committed_at           |
 +-------------------+---------+-----------------------+
-|5215754325436161589|append   |2026-10-11 15:59:17.772|
+|8512544428242300220|append   |2026-10-12 12:07:08.822|
 +-------------------+---------+-----------------------+
 
 ### 5. Запрос варианта 3 (Q18) в Spark прямо по Bronze
-  строк: 100, время: 17.0 с
+[11.962s][warning][gc,alloc] Executor task launch worker for task 6.0 in stage 31.0 (TID 80): Retried waiting for GCLocker too often allocating 16777218 words
+  строк: 100, время: 11.3 с
   сумма total_quantity: 30977
   сумма totalprice: 51135629.28
   Customer#001287812  order 42290181  1997-11-26  558289.17  qty 318
